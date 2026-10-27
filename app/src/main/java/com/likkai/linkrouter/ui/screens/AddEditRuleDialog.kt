@@ -2,12 +2,9 @@ package com.likkai.linkrouter.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material3.*
 import com.likkai.linkrouter.ui.components.BrowserIcon
@@ -50,7 +47,6 @@ fun AddEditRuleDialog(
         mutableStateOf(editingRule?.toSourceApp(installedApps))
     }
     var showBrowserPicker by remember { mutableStateOf(false) }
-    var showAppPicker by remember { mutableStateOf(false) }
 
     val isEditing = editingRule != null
     val canSave = selectedBrowser != null && when (matchType) {
@@ -67,12 +63,7 @@ fun AddEditRuleDialog(
             )
         },
         text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
                     "Match Type",
                     style = MaterialTheme.typography.labelMedium,
@@ -123,78 +114,11 @@ fun AddEditRuleDialog(
                     )
                 }
 
-                Text(
-                    "Opened from",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                OutlinedCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showAppPicker = true }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (sourceApp != null) {
-                            BrowserIcon(
-                                packageName = sourceApp!!.packageName,
-                                size = 28.dp
-                            )
-                        } else {
-                            Icon(
-                                Icons.Default.Apps,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                sourceApp?.label ?: if (matchType == MatchType.SOURCE_APP) {
-                                    "Select an app"
-                                } else {
-                                    "Any app"
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = if (sourceApp != null)
-                                    MaterialTheme.colorScheme.onSurface
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (sourceApp != null) {
-                                Text(
-                                    sourceApp!!.packageName,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                        if (sourceApp != null && matchType != MatchType.SOURCE_APP) {
-                            IconButton(onClick = { sourceApp = null }) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Match any app"
-                                )
-                            }
-                        }
-                    }
-                }
-                Text(
-                    when (matchType) {
-                        MatchType.SOURCE_APP -> "Every link opened from this app"
-                        MatchType.DOMAIN, MatchType.EXACT_URL ->
-                            "Optional. Limit this rule to links opened from one app."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                InstalledAppDropdown(
+                    apps = installedApps,
+                    selected = sourceApp,
+                    allowAny = matchType != MatchType.SOURCE_APP,
+                    onSelect = { sourceApp = it }
                 )
 
                 Text(
@@ -284,28 +208,114 @@ fun AddEditRuleDialog(
         )
     }
 
-    if (showAppPicker) {
-        BrowserPickerDialog(
-            browsers = installedApps,
-            selectedPackage = sourceApp?.packageName,
-            onSelect = { app ->
-                sourceApp = app
-                showAppPicker = false
-            },
-            onDismiss = { showAppPicker = false },
-            title = "Opened from",
-            emptyMessage = "No apps found on this device.",
-            showSearch = true,
-            anyLabel = if (matchType == MatchType.SOURCE_APP) null else "Any app",
-            onSelectAny = if (matchType == MatchType.SOURCE_APP) {
-                null
-            } else {
-                {
-                    sourceApp = null
-                    showAppPicker = false
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InstalledAppDropdown(
+    apps: List<BrowserApp>,
+    selected: BrowserApp?,
+    allowAny: Boolean,
+    onSelect: (BrowserApp?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = selected?.label ?: if (allowAny) "Any app" else "",
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text("Opened from") },
+            placeholder = { Text("Select an app") },
+            leadingIcon = {
+                if (selected != null) {
+                    BrowserIcon(packageName = selected.packageName, size = 24.dp)
+                } else {
+                    Icon(
+                        Icons.Default.Apps,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
-            }
+            },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            supportingText = {
+                Text(
+                    when {
+                        selected != null -> selected.packageName
+                        allowAny -> "Optional. Choose an installed app, or leave as Any app."
+                        else -> "Every link opened from the selected app"
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
         )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 320.dp)
+        ) {
+            if (allowAny) {
+                DropdownMenuItem(
+                    text = { Text("Any app") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Apps, contentDescription = null)
+                    },
+                    onClick = {
+                        onSelect(null)
+                        expanded = false
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                )
+            }
+            if (apps.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("No apps installed") },
+                    onClick = {},
+                    enabled = false,
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                )
+            }
+            apps.forEach { app ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(
+                                app.label,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                app.packageName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    },
+                    leadingIcon = {
+                        BrowserIcon(packageName = app.packageName, size = 24.dp)
+                    },
+                    onClick = {
+                        onSelect(app)
+                        expanded = false
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                )
+            }
+        }
     }
 }
 

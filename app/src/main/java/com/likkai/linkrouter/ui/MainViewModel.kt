@@ -53,7 +53,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadBrowsers() {
         _installedBrowsers.value = browserResolver.getInstalledBrowsers()
-        _installedApps.value = installedAppResolver.getLaunchableApps()
+        _installedApps.value = installedAppResolver.getInstalledApps()
         // If no default browser is set yet, auto-select the first available
         if (_defaultBrowserPackage.value == null && _installedBrowsers.value.isNotEmpty()) {
             setDefaultBrowser(_installedBrowsers.value.first())
