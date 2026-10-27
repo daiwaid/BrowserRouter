@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.likkai.linkrouter.LinkRouterApp
 import com.likkai.linkrouter.browser.BrowserApp
 import com.likkai.linkrouter.browser.BrowserResolver
+import com.likkai.linkrouter.browser.InstalledAppResolver
 import com.likkai.linkrouter.data.BrowserRule
 import com.likkai.linkrouter.data.MatchType
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = app.ruleRepository
     private val preferences = app.userPreferences
     private val browserResolver = BrowserResolver(application)
+    private val installedAppResolver = InstalledAppResolver(application)
 
     // Rules from DB, observed as Flow
     val rules: StateFlow<List<BrowserRule>> = repository.allRules
@@ -29,6 +31,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Installed browsers
     private val _installedBrowsers = MutableStateFlow<List<BrowserApp>>(emptyList())
     val installedBrowsers: StateFlow<List<BrowserApp>> = _installedBrowsers.asStateFlow()
+
+    // Apps a link can be opened from
+    private val _installedApps = MutableStateFlow<List<BrowserApp>>(emptyList())
+    val installedApps: StateFlow<List<BrowserApp>> = _installedApps.asStateFlow()
 
     // Default browser
     private val _defaultBrowserPackage = MutableStateFlow(preferences.defaultBrowserPackage)
@@ -47,21 +53,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadBrowsers() {
         _installedBrowsers.value = browserResolver.getInstalledBrowsers()
+        _installedApps.value = installedAppResolver.getLaunchableApps()
         // If no default browser is set yet, auto-select the first available
         if (_defaultBrowserPackage.value == null && _installedBrowsers.value.isNotEmpty()) {
             setDefaultBrowser(_installedBrowsers.value.first())
         }
     }
 
-    fun addRule(matchType: MatchType, pattern: String, browser: BrowserApp) {
+    fun addRule(
+        matchType: MatchType,
+        pattern: String,
+        browser: BrowserApp,
+        sourceApp: BrowserApp?
+    ) {
+        if (matchType == MatchType.SOURCE_APP && sourceApp == null) return
+        if (matchType != MatchType.SOURCE_APP && pattern.isBlank()) return
+
         viewModelScope.launch {
             val orderIndex = repository.getNextOrderIndex()
             val rule = BrowserRule(
                 matchType = matchType,
-                pattern = pattern.trim(),
+                pattern = if (matchType == MatchType.SOURCE_APP) "" else pattern.trim(),
                 targetBrowserPackage = browser.packageName,
                 targetBrowserLabel = browser.label,
-                orderIndex = orderIndex
+                orderIndex = orderIndex,
+                sourcePackage = sourceApp?.packageName,
+                sourceLabel = sourceApp?.label
             )
             repository.insertRule(rule)
         }

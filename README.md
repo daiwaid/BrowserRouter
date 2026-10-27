@@ -21,6 +21,7 @@ Route links to different browsers depending on rules:
 ### 🌐 Match Modes
 - Exact URL match
 - Domain match (includes subdomains)
+- The app the link was opened from (every link from that app, or only some links)
 
 ### 🌍 Multi-Browser Support
 Choose any installed browser per rule:
@@ -62,6 +63,8 @@ Each rule consists of:
 - Match type:
     - Exact URL
     - Domain (includes subdomains)
+    - App the link was opened from
+- Optional source app, to limit a URL rule to one app
 - Target browser
 - Priority
 - Enabled/disabled toggle

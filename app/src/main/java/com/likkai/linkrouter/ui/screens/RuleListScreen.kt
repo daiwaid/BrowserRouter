@@ -132,7 +132,7 @@ fun RuleListScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Rules are evaluated top to bottom. First match wins.",
+                        "First match wins. Match the link, the app that opened it, or both.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -174,7 +174,7 @@ fun RuleListScreen(
             onDismissRequest = { showDeleteDialog = null },
             title = { Text("Delete Rule") },
             text = {
-                Text("Delete the rule for \"${rule.pattern}\"? This action cannot be undone.")
+                Text("Delete the rule for \"${rule.summaryTitle()}\"? This action cannot be undone.")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -231,6 +231,7 @@ private fun RuleCard(
                         when (rule.matchType) {
                             MatchType.EXACT_URL -> "URL"
                             MatchType.DOMAIN -> "Domain"
+                            MatchType.SOURCE_APP -> "App"
                         },
                         style = MaterialTheme.typography.labelSmall
                     )
@@ -243,16 +244,18 @@ private fun RuleCard(
             // Pattern and browser label
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    rule.pattern,
+                    rule.summaryTitle(),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    rule.targetBrowserLabel,
+                    rule.routeLabel(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -299,6 +302,19 @@ private fun RuleCard(
             }
         }
     }
+}
+
+private fun BrowserRule.summaryTitle(): String = when (matchType) {
+    MatchType.SOURCE_APP -> sourceLabel ?: sourcePackage ?: "App"
+    else -> pattern
+}
+
+private fun BrowserRule.routeLabel(): String {
+    val from = when (matchType) {
+        MatchType.SOURCE_APP -> null
+        else -> sourceLabel ?: sourcePackage
+    }
+    return if (from.isNullOrBlank()) targetBrowserLabel else "from $from · $targetBrowserLabel"
 }
 
 @Composable
