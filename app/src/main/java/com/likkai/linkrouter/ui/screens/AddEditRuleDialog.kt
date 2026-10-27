@@ -1,6 +1,8 @@
 package com.likkai.linkrouter.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.FocusInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -63,33 +65,53 @@ fun AddEditRuleDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                if (isEditing) "Edit Rule" else "Add Rule",
-                fontWeight = FontWeight.Bold
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    if (isEditing) "Edit Rule" else "Add Rule",
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "1. add a URL pattern and/or choose an app where the links are opened from\n" +
+                        "2. select the browser to open links matching this rule with",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                val patternInteraction = remember { MutableInteractionSource() }
+                val outline = MaterialTheme.colorScheme.outline
+                val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                 OutlinedTextField(
                     value = pattern,
                     onValueChange = { pattern = it },
                     singleLine = true,
+                    interactionSource = patternInteraction,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Uri,
                         autoCorrectEnabled = false
                     ),
                     label = { Text("URL pattern") },
-                    placeholder = { Text("*.google.com") },
+                    placeholder = { Text("*") },
                     supportingText = {
                         Text(
-                            "Optional if an app is selected. * matches any text. " +
-                                "*.google.com matches that site and its subdomains. " +
-                                "github.com/name/* matches every page under that path. " +
-                                "A full URL matches that page."
+                            "*.domain.com/* matches domain.com and its subdomains, on any path, " +
+                                "domain.com/topic/* matches every page under that path, " +
+                                "and domain.com/page matches that page only"
                         )
                     },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = outline,
+                        unfocusedBorderColor = outline,
+                        focusedLabelColor = labelColor,
+                        unfocusedLabelColor = labelColor
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
+                LaunchedEffect(patternInteraction) {
+                    patternInteraction.emit(FocusInteraction.Focus())
+                }
 
                 InstalledAppDropdown(
                     apps = installedApps,
@@ -240,17 +262,6 @@ private fun InstalledAppDropdown(
             },
             trailingIcon = {
                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-            },
-            supportingText = {
-                Text(
-                    when {
-                        selected != null -> selected.packageName
-                        allowAny -> "Optional if a URL pattern is set. Any app matches every source."
-                        else -> "Every link opened from the selected app"
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             },
             modifier = Modifier
                 .fillMaxWidth()

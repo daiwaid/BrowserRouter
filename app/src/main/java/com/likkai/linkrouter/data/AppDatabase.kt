@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [BrowserRule::class, RedirectDomain::class, RedirectCache::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -38,11 +38,11 @@ abstract class AppDatabase : RoomDatabase() {
 
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Old domain rules become wildcard patterns: example.com -> *.example.com
+                // Old domain rules match the whole site: example.com -> *.example.com/*
                 db.execSQL(
                     """
                     UPDATE browser_rules
-                    SET pattern = '*.' || pattern
+                    SET pattern = '*.' || pattern || '/*'
                     WHERE matchType = 'DOMAIN'
                       AND pattern != ''
                       AND instr(pattern, '*') = 0
@@ -60,6 +60,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Patterns saved as *.host used to mean every path. Keep that behavior.
+                db.execSQL(
+                    """
+                    UPDATE browser_rules
+                    SET pattern = pattern || '/*'
+                    WHERE pattern LIKE '*.%'
+                      AND instr(pattern, '/') = 0
+                      AND length(pattern) - length(replace(pattern, '*', '')) = 1
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -67,7 +82,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "linkrouter_database"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {

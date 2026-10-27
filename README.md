@@ -14,17 +14,17 @@ It is designed to be:
 
 ### 🔀 Smart Browser Routing
 Route links to different browsers depending on rules:
-- `*.twitter.com` → Firefox
+- `*.twitter.com/*` → Firefox
 - `github.com/daiwaid/*` → Chrome
 - Links opened from Slack → Brave
 
 ### 🌐 Match Modes
 One rule can set a URL pattern, the app the link was opened from, or both. A rule can be saved when at least one of those is set.
-- `*` matches any text
-- `*.google.com` matches google.com and its subdomains
-- `github.com/daiwaid/*` matches every page under that path
-- `https://github.com/daiwaid/BrowserRouter` matches that page
-- Leave the pattern blank to match every link opened from the selected app
+- `*.domain.com/*` matches domain.com and its subdomains, on any path
+- `domain.com/topic/*` matches every page under that path
+- `domain.com/page` matches that page only
+- `domain.com` matches only the root of domain.com and www.domain.com
+- Leave the pattern blank, shown as `*`, to match every link opened from the selected app
 
 ### 🌍 Multi-Browser Support
 Choose any installed browser per rule:

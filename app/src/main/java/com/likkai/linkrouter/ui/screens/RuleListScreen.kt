@@ -223,31 +223,25 @@ private fun RuleCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val sourcePackage = rule.sourcePackage
-            if (!sourcePackage.isNullOrBlank()) {
-                Box(
-                    modifier = Modifier.size(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+            Box(
+                modifier = Modifier.size(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val sourcePackage = rule.sourcePackage
+                if (!sourcePackage.isNullOrBlank()) {
                     BrowserIcon(
                         packageName = sourcePackage,
                         size = 32.dp
                     )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-
-            // Match type badge
-            AssistChip(
-                onClick = { },
-                label = {
-                    Text(
-                        if (rule.pattern.isBlank()) "App" else "Link",
-                        style = MaterialTheme.typography.labelSmall
+                } else {
+                    Icon(
+                        Icons.Default.Apps,
+                        contentDescription = "All apps",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
                     )
-                },
-                modifier = Modifier.height(28.dp)
-            )
+                }
+            }
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -314,8 +308,7 @@ private fun RuleCard(
     }
 }
 
-private fun BrowserRule.summaryTitle(): String =
-    pattern.ifBlank { sourceLabel ?: sourcePackage ?: "App" }
+private fun BrowserRule.summaryTitle(): String = pattern.ifBlank { "*" }
 
 private fun BrowserRule.routeLabel(): String {
     val from = if (pattern.isBlank()) null else sourceLabel ?: sourcePackage
@@ -340,22 +333,18 @@ private fun DefaultBrowserCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AssistChip(
-                onClick = { },
-                label = {
-                    Text("Default", style = MaterialTheme.typography.labelSmall)
-                },
-                modifier = Modifier.height(28.dp),
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
+            Icon(
+                Icons.Default.Apps,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
             )
 
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "All other links",
+                    "Default",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
