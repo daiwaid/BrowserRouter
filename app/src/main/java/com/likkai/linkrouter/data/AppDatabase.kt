@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [BrowserRule::class, RedirectDomain::class, RedirectCache::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -36,6 +36,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Old domain rules become wildcard patterns: example.com -> *.example.com
+                db.execSQL(
+                    """
+                    UPDATE browser_rules
+                    SET pattern = '*.' || pattern
+                    WHERE matchType = 'DOMAIN'
+                      AND pattern != ''
+                      AND instr(pattern, '*') = 0
+                      AND instr(pattern, '/') = 0
+                      AND instr(pattern, '://') = 0
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    UPDATE browser_rules
+                    SET matchType = 'PATTERN'
+                    WHERE matchType IN ('DOMAIN', 'EXACT_URL', 'SOURCE_APP')
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -43,7 +67,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "linkrouter_database"
                 )
-                    .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration()
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {

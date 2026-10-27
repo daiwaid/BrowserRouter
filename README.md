@@ -6,7 +6,7 @@ It is designed to be:
 - Fast (instant routing, no unnecessary processing)
 - Private (no analytics or tracking)
 - Fully local (no backend server required)
-- Flexible (domain-based rules + optional redirect resolution)
+- Flexible (wildcard link rules, source-app rules, and optional redirect resolution)
 
 ---
 
@@ -14,14 +14,17 @@ It is designed to be:
 
 ### 🔀 Smart Browser Routing
 Route links to different browsers depending on rules:
-- `twitter.com` → Firefox
-- `github.com` → Chrome
-- `youtube.com` → Brave
+- `*.twitter.com` → Firefox
+- `github.com/daiwaid/*` → Chrome
+- Links opened from Slack → Brave
 
 ### 🌐 Match Modes
-- Exact URL match
-- Domain match (includes subdomains)
-- The app the link was opened from (every link from that app, or only some links)
+One rule can set a URL pattern, the app the link was opened from, or both. A rule can be saved when at least one of those is set.
+- `*` matches any text
+- `*.google.com` matches google.com and its subdomains
+- `github.com/daiwaid/*` matches every page under that path
+- `https://github.com/daiwaid/BrowserRouter` matches that page
+- Leave the pattern blank to match every link opened from the selected app
 
 ### 🌍 Multi-Browser Support
 Choose any installed browser per rule:
@@ -60,11 +63,9 @@ Supports resolving shortened or redirect links before routing:
 
 Each rule consists of:
 
-- Match type:
-    - Exact URL
-    - Domain (includes subdomains)
-    - App the link was opened from
-- Optional source app, to limit a URL rule to one app
+- Optional wildcard URL pattern
+- Optional source app (the app the link was opened from)
+- At least one of those is required
 - Target browser
 - Priority
 - Enabled/disabled toggle

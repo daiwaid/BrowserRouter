@@ -15,7 +15,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.likkai.linkrouter.data.BrowserRule
-import com.likkai.linkrouter.data.MatchType
 import com.likkai.linkrouter.ui.components.BrowserIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -133,7 +132,7 @@ fun RuleListScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "First match wins. Match the link, the app that opened it, or both.",
+                        "First match wins. Set a wildcard link, the app that opened it, or both.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -243,11 +242,7 @@ private fun RuleCard(
                 onClick = { },
                 label = {
                     Text(
-                        when (rule.matchType) {
-                            MatchType.EXACT_URL -> "URL"
-                            MatchType.DOMAIN -> "Domain"
-                            MatchType.SOURCE_APP -> "App"
-                        },
+                        if (rule.pattern.isBlank()) "App" else "Link",
                         style = MaterialTheme.typography.labelSmall
                     )
                 },
@@ -319,16 +314,11 @@ private fun RuleCard(
     }
 }
 
-private fun BrowserRule.summaryTitle(): String = when (matchType) {
-    MatchType.SOURCE_APP -> sourceLabel ?: sourcePackage ?: "App"
-    else -> pattern
-}
+private fun BrowserRule.summaryTitle(): String =
+    pattern.ifBlank { sourceLabel ?: sourcePackage ?: "App" }
 
 private fun BrowserRule.routeLabel(): String {
-    val from = when (matchType) {
-        MatchType.SOURCE_APP -> null
-        else -> sourceLabel ?: sourcePackage
-    }
+    val from = if (pattern.isBlank()) null else sourceLabel ?: sourcePackage
     return if (from.isNullOrBlank()) targetBrowserLabel else "from $from · $targetBrowserLabel"
 }
 

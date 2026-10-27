@@ -21,22 +21,22 @@ import androidx.compose.ui.unit.dp
 import com.likkai.linkrouter.browser.BrowserApp
 import com.likkai.linkrouter.data.BrowserRule
 import com.likkai.linkrouter.data.MatchType
+import com.likkai.linkrouter.engine.editorPattern
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditRuleDialog(
     editingRule: BrowserRule?,
     installedBrowsers: List<BrowserApp>,
     installedApps: List<BrowserApp>,
     onDismiss: () -> Unit,
-    onSave: (MatchType, String, BrowserApp, BrowserApp?) -> Unit,
+    onSave: (String, BrowserApp, BrowserApp?) -> Unit,
     onUpdate: (BrowserRule) -> Unit
 ) {
-    var matchType by remember {
-        mutableStateOf(editingRule?.matchType ?: MatchType.DOMAIN)
-    }
     var pattern by remember {
-        mutableStateOf(editingRule?.pattern ?: "")
+        mutableStateOf(
+            editingRule?.let { editorPattern(it.matchType, it.pattern) } ?: ""
+        )
     }
     var selectedBrowser by remember {
         mutableStateOf(
@@ -52,10 +52,7 @@ fun AddEditRuleDialog(
     var showBrowserPicker by remember { mutableStateOf(false) }
 
     val isEditing = editingRule != null
-    val canSave = selectedBrowser != null && when (matchType) {
-        MatchType.SOURCE_APP -> sourceApp != null
-        MatchType.EXACT_URL, MatchType.DOMAIN -> pattern.isNotBlank()
-    }
+    val canSave = selectedBrowser != null && (pattern.isNotBlank() || sourceApp != null)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -67,60 +64,31 @@ fun AddEditRuleDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(
-                    "Match Type",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                OutlinedTextField(
+                    value = pattern,
+                    onValueChange = { pattern = it },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Uri,
+                        autoCorrectEnabled = false
+                    ),
+                    label = { Text("URL pattern") },
+                    placeholder = { Text("*.google.com") },
+                    supportingText = {
+                        Text(
+                            "Optional if an app is selected. * matches any text. " +
+                                "*.google.com matches that site and its subdomains. " +
+                                "github.com/name/* matches every page under that path. " +
+                                "A full URL matches that page."
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = matchType == MatchType.DOMAIN,
-                        onClick = { matchType = MatchType.DOMAIN },
-                        label = { Text("Entire Domain") }
-                    )
-                    FilterChip(
-                        selected = matchType == MatchType.EXACT_URL,
-                        onClick = { matchType = MatchType.EXACT_URL },
-                        label = { Text("Exact URL") }
-                    )
-                    FilterChip(
-                        selected = matchType == MatchType.SOURCE_APP,
-                        onClick = { matchType = MatchType.SOURCE_APP },
-                        label = { Text("From app") }
-                    )
-                }
-
-                if (matchType != MatchType.SOURCE_APP) {
-                    val exactUrl = matchType == MatchType.EXACT_URL
-                    OutlinedTextField(
-                        value = pattern,
-                        onValueChange = { pattern = it },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Uri,
-                            autoCorrectEnabled = false
-                        ),
-                        label = { Text(if (exactUrl) "URL" else "Domain") },
-                        placeholder = {
-                            Text(if (exactUrl) "https://example.com/home" else "example.com")
-                        },
-                        supportingText = {
-                            Text(
-                                if (exactUrl) "Match this exact URL only"
-                                else "Match all URLs on this domain (including subdomains)"
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
 
                 InstalledAppDropdown(
                     apps = installedApps,
                     selected = sourceApp,
-                    allowAny = matchType != MatchType.SOURCE_APP,
+                    allowAny = true,
                     onSelect = { sourceApp = it }
                 )
 
@@ -169,13 +137,14 @@ fun AddEditRuleDialog(
             Button(
                 onClick = {
                     val browser = selectedBrowser ?: return@Button
-                    val savedPattern = if (matchType == MatchType.SOURCE_APP) "" else pattern.trim()
+                    val savedPattern = pattern.trim()
                     val savedSource = sourceApp
+                    if (savedPattern.isEmpty() && savedSource == null) return@Button
                     val existing = editingRule
                     if (existing != null) {
                         onUpdate(
                             existing.copy(
-                                matchType = matchType,
+                                matchType = MatchType.PATTERN,
                                 pattern = savedPattern,
                                 targetBrowserPackage = browser.packageName,
                                 targetBrowserLabel = browser.label,
@@ -184,7 +153,7 @@ fun AddEditRuleDialog(
                             )
                         )
                     } else {
-                        onSave(matchType, savedPattern, browser, savedSource)
+                        onSave(savedPattern, browser, savedSource)
                     }
                 },
                 enabled = canSave
@@ -268,7 +237,7 @@ private fun InstalledAppDropdown(
                 Text(
                     when {
                         selected != null -> selected.packageName
-                        allowAny -> "Optional. Choose an installed app, or leave as Any app."
+                        allowAny -> "Optional if a URL pattern is set. Any app matches every source."
                         else -> "Every link opened from the selected app"
                     },
                     maxLines = 1,

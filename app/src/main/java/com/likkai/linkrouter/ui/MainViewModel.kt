@@ -61,19 +61,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addRule(
-        matchType: MatchType,
         pattern: String,
         browser: BrowserApp,
         sourceApp: BrowserApp?
     ) {
-        if (matchType == MatchType.SOURCE_APP && sourceApp == null) return
-        if (matchType != MatchType.SOURCE_APP && pattern.isBlank()) return
+        val trimmed = pattern.trim()
+        if (trimmed.isEmpty() && sourceApp == null) return
 
         viewModelScope.launch {
             val orderIndex = repository.getNextOrderIndex()
             val rule = BrowserRule(
-                matchType = matchType,
-                pattern = if (matchType == MatchType.SOURCE_APP) "" else pattern.trim(),
+                matchType = MatchType.PATTERN,
+                pattern = trimmed,
                 targetBrowserPackage = browser.packageName,
                 targetBrowserLabel = browser.label,
                 orderIndex = orderIndex,
