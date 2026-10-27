@@ -1,6 +1,6 @@
-# LinkRouter
+# BrowserRouter
 
-LinkRouter is an Android application that acts as a **smart default browser router**. Instead of opening links directly in a single browser, it intercepts all web links and routes them to different browsers based on user-defined rules.
+BrowserRouter is an Android application that acts as a **smart default browser router**. Instead of opening links directly in a single browser, it intercepts all web links and routes them to different browsers based on user-defined rules.
 
 It is designed to be:
 - Fast (instant routing, no unnecessary processing)
@@ -51,8 +51,8 @@ Supports resolving shortened or redirect links before routing:
 ## 📱 How It Works
 
 1. User clicks a link in any app
-2. Android sends the link to LinkRouter (set as default browser)
-3. LinkRouter evaluates routing rules
+2. Android sends the link to BrowserRouter (set as default browser)
+3. BrowserRouter evaluates routing rules
 4. (Optional) resolves redirect links like `t.co`
 5. Opens the link directly in that browser
 6. Exits immediately

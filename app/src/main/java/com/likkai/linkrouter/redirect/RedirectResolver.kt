@@ -31,7 +31,7 @@ class RedirectResolver {
                 connection.requestMethod = "HEAD"
                 connection.connectTimeout = CONNECT_TIMEOUT_MS
                 connection.readTimeout = READ_TIMEOUT_MS
-                connection.setRequestProperty("User-Agent", "LinkRouter/1.0")
+                connection.setRequestProperty("User-Agent", "BrowserRouter/1.0")
 
                 try {
                     val responseCode = connection.responseCode

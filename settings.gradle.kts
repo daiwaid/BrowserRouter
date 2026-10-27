@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LinkRouter"
+rootProject.name = "BrowserRouter"
 include(":app")
  
