@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.likkai.linkrouter.data.BrowserRule
 import com.likkai.linkrouter.data.MatchType
+import com.likkai.linkrouter.ui.components.BrowserIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -223,6 +224,20 @@ private fun RuleCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val sourcePackage = rule.sourcePackage
+            if (!sourcePackage.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier.size(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BrowserIcon(
+                        packageName = sourcePackage,
+                        size = 32.dp
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
             // Match type badge
             AssistChip(
                 onClick = { },

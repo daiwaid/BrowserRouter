@@ -2,10 +2,13 @@ package com.likkai.linkrouter.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import com.likkai.linkrouter.ui.components.BrowserIcon
 import androidx.compose.runtime.*
@@ -219,10 +222,25 @@ private fun InstalledAppDropdown(
     onSelect: (BrowserApp?) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(apps, query) {
+        if (query.isBlank()) {
+            apps
+        } else {
+            apps.filter { app ->
+                app.label.contains(query, ignoreCase = true) ||
+                    app.packageName.contains(query, ignoreCase = true)
+            }
+        }
+    }
+    val showAny = allowAny && query.isBlank()
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = it },
+        onExpandedChange = { next ->
+            expanded = next
+            if (!next) query = ""
+        },
         modifier = Modifier.fillMaxWidth()
     ) {
         OutlinedTextField(
@@ -263,57 +281,91 @@ private fun InstalledAppDropdown(
         )
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.heightIn(max = 320.dp)
+            onDismissRequest = {
+                expanded = false
+                query = ""
+            }
         ) {
-            if (allowAny) {
-                DropdownMenuItem(
-                    text = { Text("Any app") },
+            Column(Modifier.height(320.dp).fillMaxWidth()) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    placeholder = { Text("Search apps") },
                     leadingIcon = {
-                        Icon(Icons.Default.Apps, contentDescription = null)
+                        Icon(Icons.Default.Search, contentDescription = null)
                     },
-                    onClick = {
-                        onSelect(null)
-                        expanded = false
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 )
-            }
-            if (apps.isEmpty()) {
-                DropdownMenuItem(
-                    text = { Text("No apps installed") },
-                    onClick = {},
-                    enabled = false,
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
-                )
-            }
-            apps.forEach { app ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(
-                                app.label,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                app.packageName,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                    if (showAny) {
+                        item(key = "any") {
+                            DropdownMenuItem(
+                                text = { Text("Any app") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Apps, contentDescription = null)
+                                },
+                                onClick = {
+                                    onSelect(null)
+                                    expanded = false
+                                    query = ""
+                                },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                             )
                         }
-                    },
-                    leadingIcon = {
-                        BrowserIcon(packageName = app.packageName, size = 24.dp)
-                    },
-                    onClick = {
-                        onSelect(app)
-                        expanded = false
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
-                )
+                    }
+                    if (apps.isEmpty()) {
+                        item(key = "none") {
+                            DropdownMenuItem(
+                                text = { Text("No apps installed") },
+                                onClick = {},
+                                enabled = false,
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
+                        }
+                    } else if (filtered.isEmpty()) {
+                        item(key = "no-match") {
+                            DropdownMenuItem(
+                                text = { Text("No matching apps") },
+                                onClick = {},
+                                enabled = false,
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
+                        }
+                    }
+                    items(filtered, key = { it.packageName }) { app ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        app.label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        app.packageName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            },
+                            leadingIcon = {
+                                BrowserIcon(packageName = app.packageName, size = 24.dp)
+                            },
+                            onClick = {
+                                onSelect(app)
+                                expanded = false
+                                query = ""
+                            },
+                            contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                        )
+                    }
+                }
             }
         }
     }
