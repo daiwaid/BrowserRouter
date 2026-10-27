@@ -132,9 +132,9 @@ jobs:
           fi
           "$tools/apksigner" verify --verbose "$src"
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            name="LinkRouter-${GITHUB_REF_NAME}.apk"
+            name="BrowserRouter-${GITHUB_REF_NAME}.apk"
           else
-            name="LinkRouter-${GITHUB_SHA::7}.apk"
+            name="BrowserRouter-${GITHUB_SHA::7}.apk"
           fi
           cp "$src" "$RUNNER_TEMP/$name"
           echo "APK_PATH=$RUNNER_TEMP/$name" >> "$GITHUB_ENV"
@@ -156,6 +156,6 @@ jobs:
           else
             gh release create "$tag" "$APK_PATH" \
               --target "$GITHUB_SHA" \
-              --title "LinkRouter ${tag}" \
+              --title "BrowserRouter ${tag}" \
               "${notes[@]}"
           fi
