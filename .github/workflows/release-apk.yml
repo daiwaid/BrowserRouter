@@ -1,0 +1,161 @@
+# Builds a signed release APK and attaches it to a GitHub Release.
+#
+# Run it by pushing a tag such as v1.0, or from the Actions tab with
+# "Build release APK".
+#
+# Repository secrets:
+#   KEYSTORE_BASE64    base64 of the .jks or .keystore file
+#                      Linux:  base64 -w 0 release.jks
+#                      macOS:  base64 -i release.jks | tr -d '\n'
+#   KEYSTORE_PASSWORD  keystore store password
+#   KEY_ALIAS          key alias inside the keystore
+#   KEY_PASSWORD       key password
+name: Build release APK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Sign and publish APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Android SDK packages
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$sdk" ]; then
+            echo "Android SDK is not installed on this runner."
+            exit 1
+          fi
+          if command -v sdkmanager >/dev/null 2>&1; then
+            manager=sdkmanager
+          else
+            manager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          yes | "$manager" --licenses >/dev/null || true
+          "$manager" --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64}" ]; then
+            echo "Secret KEYSTORE_BASE64 is empty."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          if [ ! -s "$RUNNER_TEMP/release.jks" ]; then
+            echo "Decoded keystore is empty."
+            exit 1
+          fi
+
+      - name: Write signing config
+        env:
+          STORE_FILE: ${{ runner.temp }}/release.jks
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$STORE_PASSWORD" ]; then
+            echo "Secret KEYSTORE_PASSWORD is empty."
+            exit 1
+          fi
+          if [ -z "$KEY_ALIAS" ]; then
+            echo "Secret KEY_ALIAS is empty."
+            exit 1
+          fi
+          if [ -z "$KEY_PASSWORD" ]; then
+            echo "Secret KEY_PASSWORD is empty."
+            exit 1
+          fi
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          def escape(value: str) -> str:
+              out = []
+              for char in value:
+                  if char in "\\#:!= \t":
+                      out.append("\\" + char)
+                  elif char == "\n":
+                      out.append("\\n")
+                  else:
+                      out.append(char)
+              return "".join(out)
+
+          lines = [
+              f"storeFile={escape(os.environ['STORE_FILE'])}",
+              f"storePassword={escape(os.environ['STORE_PASSWORD'])}",
+              f"keyAlias={escape(os.environ['KEY_ALIAS'])}",
+              f"keyPassword={escape(os.environ['KEY_PASSWORD'])}",
+          ]
+          Path("keystore.properties").write_text("\n".join(lines) + "\n")
+          PY
+
+      - name: Build release APK
+        run: bash ./gradlew assembleRelease --no-daemon
+
+      - name: Check the APK signature
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          tools=$(find "$sdk/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          src=$(find app/build/outputs/apk/release -type f -name '*release*.apk' ! -name '*unsigned*' | head -1)
+          if [ -z "$src" ]; then
+            echo "Release APK was not produced."
+            exit 1
+          fi
+          "$tools/apksigner" verify --verbose "$src"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            name="BrowserRouter-${GITHUB_REF_NAME}.apk"
+          else
+            name="BrowserRouter-${GITHUB_SHA::7}.apk"
+          fi
+          cp "$src" "$RUNNER_TEMP/$name"
+          echo "APK_PATH=$RUNNER_TEMP/$name" >> "$GITHUB_ENV"
+
+      - name: Publish APK to the repository release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+            notes=(--generate-notes)
+          else
+            tag="apk-${GITHUB_SHA::7}"
+            notes=(--notes "Signed release APK for ${GITHUB_SHA}.")
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$APK_PATH" --clobber
+          else
+            gh release create "$tag" "$APK_PATH" \
+              --target "$GITHUB_SHA" \
+              --title "BrowserRouter ${tag}" \
+              "${notes[@]}"
+          fi
