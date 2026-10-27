@@ -174,8 +174,8 @@ class MainActivity : ComponentActivity() {
                             installedBrowsers = browsers,
                             installedApps = apps,
                             onDismiss = { showAddDialog = false },
-                            onSave = { matchType, pattern, browser, sourceApp ->
-                                mainViewModel.addRule(matchType, pattern, browser, sourceApp)
+                            onSave = { pattern, browser, sourceApp ->
+                                mainViewModel.addRule(pattern, browser, sourceApp)
                                 showAddDialog = false
                             },
                             onUpdate = { }
@@ -192,7 +192,7 @@ class MainActivity : ComponentActivity() {
                             installedBrowsers = browsers,
                             installedApps = apps,
                             onDismiss = { editingRule = null },
-                            onSave = { _, _, _, _ -> },
+                            onSave = { _, _, _ -> },
                             onUpdate = { updatedRule ->
                                 mainViewModel.updateRule(updatedRule)
                                 editingRule = null

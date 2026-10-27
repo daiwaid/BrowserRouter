@@ -1,9 +1,7 @@
 package com.likkai.linkrouter.engine
 
-import android.net.Uri
 import android.util.Log
 import com.likkai.linkrouter.data.BrowserRule
-import com.likkai.linkrouter.data.MatchType
 import com.likkai.linkrouter.data.RuleRepository
 
 class RuleEngine(
@@ -47,14 +45,14 @@ class RuleEngine(
                 if (debug) {
                     Log.d(
                         TAG,
-                        "MATCH: Rule ${rule.id} (${rule.matchType}: ${rule.pattern}, from=${rule.sourcePackage ?: "*"}) -> ${rule.targetBrowserPackage}"
+                        "MATCH: Rule ${rule.id} (${rule.pattern.ifBlank { "*" }}, from=${rule.sourcePackage ?: "*"}) -> ${rule.targetBrowserPackage}"
                     )
                 }
                 return rule.targetBrowserPackage
             } else if (debug) {
                 Log.d(
                     TAG,
-                    "No match: Rule ${rule.id} (${rule.matchType}: ${rule.pattern}, from=${rule.sourcePackage ?: "*"})"
+                    "No match: Rule ${rule.id} (${rule.pattern.ifBlank { "*" }}, from=${rule.sourcePackage ?: "*"})"
                 )
             }
         }
@@ -64,31 +62,23 @@ class RuleEngine(
     }
 
     private fun matches(rule: BrowserRule, url: String, sourcePackage: String?): Boolean {
+        val pattern = editorPattern(rule.matchType, rule.pattern).trim()
+        val hasPattern = pattern.isNotEmpty()
+        val hasSource = !rule.sourcePackage.isNullOrBlank()
+        if (!hasPattern && !hasSource) return false
         if (!sourceMatches(rule, sourcePackage)) return false
-        return when (rule.matchType) {
-            MatchType.EXACT_URL -> url == rule.pattern
-
-            MatchType.DOMAIN -> {
-                val host = Uri.parse(url).host?.lowercase() ?: return false
-                val domain = rule.pattern.lowercase()
-                host == domain || host.endsWith(".$domain")
-            }
-
-            MatchType.SOURCE_APP -> true
-        }
+        if (!hasPattern) return true
+        return urlMatchesPattern(pattern, url)
     }
 
     /**
-     * A blank source matches links from any app, except on a source-app rule,
-     * which would otherwise capture every link.
+     * A blank source matches links from any app.
      * Package names are compared case-insensitively because the platform referrer
      * host is lowercased.
      */
     private fun sourceMatches(rule: BrowserRule, sourcePackage: String?): Boolean {
         val required = rule.sourcePackage
-        if (required.isNullOrBlank()) {
-            return rule.matchType != MatchType.SOURCE_APP
-        }
+        if (required.isNullOrBlank()) return true
         return sourcePackage != null && sourcePackage.equals(required, ignoreCase = true)
     }
 }
