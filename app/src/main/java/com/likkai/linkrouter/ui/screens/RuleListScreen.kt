@@ -11,9 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.likkai.linkrouter.R
 import com.likkai.linkrouter.data.BrowserRule
 import com.likkai.linkrouter.ui.components.BrowserIcon
 
@@ -42,7 +44,7 @@ fun RuleListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("LinkRouter", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.app_name), fontWeight = FontWeight.Bold)
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
@@ -109,7 +111,7 @@ fun RuleListScreen(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    "Set LinkRouter as your default browser to route links",
+                                    "Set ${stringResource(R.string.app_name)} as your default browser to route links",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                 )
