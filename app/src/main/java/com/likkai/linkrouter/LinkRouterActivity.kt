@@ -16,6 +16,7 @@ import com.likkai.linkrouter.browser.BrowserLauncher
 import com.likkai.linkrouter.browser.BrowserResolver
 import com.likkai.linkrouter.data.RedirectCache
 import com.likkai.linkrouter.engine.RuleEngine
+import com.likkai.linkrouter.engine.launchingAppPackage
 import com.likkai.linkrouter.redirect.RedirectResolver
 import com.likkai.linkrouter.ui.theme.LinkRouterTheme
 import kotlinx.coroutines.launch
@@ -43,10 +44,12 @@ class LinkRouterActivity : ComponentActivity() {
 
         val app = application as LinkRouterApp
         val debug = app.userPreferences.debugModeEnabled
+        val sourcePackage = launchingAppPackage()
 
         if (debug) {
             Log.d(TAG, "────────────────────────────────────")
             Log.d(TAG, "Step 1: Received URL: $url")
+            Log.d(TAG, "  Opened from: ${sourcePackage ?: "unknown"}")
         }
 
         // Show a resolving popup preemptively (will be removed on finishAndRemoveTask)
@@ -75,10 +78,10 @@ class LinkRouterActivity : ComponentActivity() {
 
                 val resolvedUrl = resolveRedirect(url, app, debug)
                 if (debug) Log.d(TAG, "Step 5: Resolved → $resolvedUrl")
-                routeUrl(resolvedUrl, app, debug)
+                routeUrl(resolvedUrl, app, debug, sourcePackage)
             } else {
                 if (debug) Log.d(TAG, "Step 4: No redirect needed → routing directly")
-                routeUrl(url, app, debug)
+                routeUrl(url, app, debug, sourcePackage)
             }
 
             if (debug) Log.d(TAG, "Step 6: Done, finishing activity")
@@ -133,13 +136,19 @@ class LinkRouterActivity : ComponentActivity() {
         return resolvedUrl
     }
 
-    private fun routeUrl(url: String, app: LinkRouterApp, debug: Boolean) {
+    private fun routeUrl(
+        url: String,
+        app: LinkRouterApp,
+        debug: Boolean,
+        sourcePackage: String?
+    ) {
         val ruleEngine = RuleEngine(app.ruleRepository, packageName)
         val browserResolver = BrowserResolver(this)
         val launcher = BrowserLauncher(this, browserResolver)
 
-        // Try rule engine first
-        val targetPackage = ruleEngine.findTargetBrowser(url, debug)
+        // Try rule engine first. Source is the app that opened the original link,
+        // including after a short link has been resolved.
+        val targetPackage = ruleEngine.findTargetBrowser(url, sourcePackage, debug)
 
         if (targetPackage != null) {
             if (debug) Log.d(TAG, "  Route: rule matched → $targetPackage")

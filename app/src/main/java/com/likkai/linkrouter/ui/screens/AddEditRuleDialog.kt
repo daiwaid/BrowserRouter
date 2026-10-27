@@ -2,9 +2,13 @@ package com.likkai.linkrouter.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import com.likkai.linkrouter.ui.components.BrowserIcon
 import androidx.compose.runtime.*
@@ -12,18 +16,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.likkai.linkrouter.browser.BrowserApp
 import com.likkai.linkrouter.data.BrowserRule
 import com.likkai.linkrouter.data.MatchType
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddEditRuleDialog(
     editingRule: BrowserRule?,
     installedBrowsers: List<BrowserApp>,
+    installedApps: List<BrowserApp>,
     onDismiss: () -> Unit,
-    onSave: (MatchType, String, BrowserApp) -> Unit,
+    onSave: (MatchType, String, BrowserApp, BrowserApp?) -> Unit,
     onUpdate: (BrowserRule) -> Unit
 ) {
     var matchType by remember {
@@ -36,13 +42,20 @@ fun AddEditRuleDialog(
         mutableStateOf(
             editingRule?.let { rule ->
                 installedBrowsers.find { it.packageName == rule.targetBrowserPackage }
+                    ?: BrowserApp(rule.targetBrowserLabel, rule.targetBrowserPackage)
             }
         )
+    }
+    var sourceApp by remember {
+        mutableStateOf(editingRule?.toSourceApp(installedApps))
     }
     var showBrowserPicker by remember { mutableStateOf(false) }
 
     val isEditing = editingRule != null
-    val canSave = pattern.isNotBlank() && selectedBrowser != null
+    val canSave = selectedBrowser != null && when (matchType) {
+        MatchType.SOURCE_APP -> sourceApp != null
+        MatchType.EXACT_URL, MatchType.DOMAIN -> pattern.isNotBlank()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -53,17 +66,15 @@ fun AddEditRuleDialog(
             )
         },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Match type selector
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
                     "Match Type",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
                         selected = matchType == MatchType.DOMAIN,
@@ -75,45 +86,44 @@ fun AddEditRuleDialog(
                         onClick = { matchType = MatchType.EXACT_URL },
                         label = { Text("Exact URL") }
                     )
+                    FilterChip(
+                        selected = matchType == MatchType.SOURCE_APP,
+                        onClick = { matchType = MatchType.SOURCE_APP },
+                        label = { Text("From app") }
+                    )
                 }
 
-                // Pattern input
-                OutlinedTextField(
-                    value = pattern,
-                    onValueChange = { pattern = it },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Uri,
-                        autoCorrect = false
-                    ),
-                    label = {
-                        Text(
-                            when (matchType) {
-                                MatchType.EXACT_URL -> "URL"
-                                MatchType.DOMAIN -> "Domain"
-                            }
-                        )
-                    },
-                    placeholder = {
-                        Text(
-                            when (matchType) {
-                                MatchType.EXACT_URL -> "https://example.com/home"
-                                MatchType.DOMAIN -> "example.com"
-                            }
-                        )
-                    },
-                    supportingText = {
-                        Text(
-                            when (matchType) {
-                                MatchType.EXACT_URL -> "Match this exact URL only"
-                                MatchType.DOMAIN -> "Match all URLs on this domain (including subdomains)"
-                            }
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                if (matchType != MatchType.SOURCE_APP) {
+                    val exactUrl = matchType == MatchType.EXACT_URL
+                    OutlinedTextField(
+                        value = pattern,
+                        onValueChange = { pattern = it },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Uri,
+                            autoCorrectEnabled = false
+                        ),
+                        label = { Text(if (exactUrl) "URL" else "Domain") },
+                        placeholder = {
+                            Text(if (exactUrl) "https://example.com/home" else "example.com")
+                        },
+                        supportingText = {
+                            Text(
+                                if (exactUrl) "Match this exact URL only"
+                                else "Match all URLs on this domain (including subdomains)"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                InstalledAppDropdown(
+                    apps = installedApps,
+                    selected = sourceApp,
+                    allowAny = matchType != MatchType.SOURCE_APP,
+                    onSelect = { sourceApp = it }
                 )
 
-                // Browser selector
                 Text(
                     "Open with",
                     style = MaterialTheme.typography.labelMedium,
@@ -158,19 +168,23 @@ fun AddEditRuleDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    selectedBrowser?.let { browser ->
-                        if (isEditing && editingRule != null) {
-                            onUpdate(
-                                editingRule.copy(
-                                    matchType = matchType,
-                                    pattern = pattern.trim(),
-                                    targetBrowserPackage = browser.packageName,
-                                    targetBrowserLabel = browser.label
-                                )
+                    val browser = selectedBrowser ?: return@Button
+                    val savedPattern = if (matchType == MatchType.SOURCE_APP) "" else pattern.trim()
+                    val savedSource = sourceApp
+                    val existing = editingRule
+                    if (existing != null) {
+                        onUpdate(
+                            existing.copy(
+                                matchType = matchType,
+                                pattern = savedPattern,
+                                targetBrowserPackage = browser.packageName,
+                                targetBrowserLabel = browser.label,
+                                sourcePackage = savedSource?.packageName,
+                                sourceLabel = savedSource?.label
                             )
-                        } else {
-                            onSave(matchType, pattern, browser)
-                        }
+                        )
+                    } else {
+                        onSave(matchType, savedPattern, browser, savedSource)
                     }
                 },
                 enabled = canSave
@@ -185,7 +199,6 @@ fun AddEditRuleDialog(
         }
     )
 
-    // Browser picker sub-dialog
     if (showBrowserPicker) {
         BrowserPickerDialog(
             browsers = installedBrowsers,
@@ -197,4 +210,169 @@ fun AddEditRuleDialog(
             onDismiss = { showBrowserPicker = false }
         )
     }
+
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InstalledAppDropdown(
+    apps: List<BrowserApp>,
+    selected: BrowserApp?,
+    allowAny: Boolean,
+    onSelect: (BrowserApp?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(apps, query) {
+        if (query.isBlank()) {
+            apps
+        } else {
+            apps.filter { app ->
+                app.label.contains(query, ignoreCase = true) ||
+                    app.packageName.contains(query, ignoreCase = true)
+            }
+        }
+    }
+    val showAny = allowAny && query.isBlank()
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { next ->
+            expanded = next
+            if (!next) query = ""
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = selected?.label ?: if (allowAny) "Any app" else "",
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text("Opened from") },
+            placeholder = { Text("Select an app") },
+            leadingIcon = {
+                if (selected != null) {
+                    BrowserIcon(packageName = selected.packageName, size = 24.dp)
+                } else {
+                    Icon(
+                        Icons.Default.Apps,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            supportingText = {
+                Text(
+                    when {
+                        selected != null -> selected.packageName
+                        allowAny -> "Optional. Choose an installed app, or leave as Any app."
+                        else -> "Every link opened from the selected app"
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                expanded = false
+                query = ""
+            }
+        ) {
+            Column(Modifier.height(320.dp).fillMaxWidth()) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    placeholder = { Text("Search apps") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    },
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+                LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                    if (showAny) {
+                        item(key = "any") {
+                            DropdownMenuItem(
+                                text = { Text("Any app") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Apps, contentDescription = null)
+                                },
+                                onClick = {
+                                    onSelect(null)
+                                    expanded = false
+                                    query = ""
+                                },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
+                        }
+                    }
+                    if (apps.isEmpty()) {
+                        item(key = "none") {
+                            DropdownMenuItem(
+                                text = { Text("No apps installed") },
+                                onClick = {},
+                                enabled = false,
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
+                        }
+                    } else if (filtered.isEmpty()) {
+                        item(key = "no-match") {
+                            DropdownMenuItem(
+                                text = { Text("No matching apps") },
+                                onClick = {},
+                                enabled = false,
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
+                        }
+                    }
+                    items(filtered, key = { it.packageName }) { app ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        app.label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        app.packageName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            },
+                            leadingIcon = {
+                                BrowserIcon(packageName = app.packageName, size = 24.dp)
+                            },
+                            onClick = {
+                                onSelect(app)
+                                expanded = false
+                                query = ""
+                            },
+                            contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun BrowserRule.toSourceApp(installedApps: List<BrowserApp>): BrowserApp? {
+    val pkg = sourcePackage ?: return null
+    return installedApps.find { it.packageName == pkg }
+        ?: BrowserApp(label = sourceLabel ?: pkg, packageName = pkg)
 }

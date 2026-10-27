@@ -105,8 +105,14 @@ class MainActivity : ComponentActivity() {
                                 isDefaultBrowser = isDefaultBrowser,
                                 debugMode = debugMode,
                                 onSetDefault = { requestDefaultBrowser() },
-                                onAddRule = { showAddDialog = true },
-                                onEditRule = { rule -> editingRule = rule },
+                                onAddRule = {
+                                    mainViewModel.loadBrowsers()
+                                    showAddDialog = true
+                                },
+                                onEditRule = { rule ->
+                                    mainViewModel.loadBrowsers()
+                                    editingRule = rule
+                                },
                                 onDeleteRule = { rule -> mainViewModel.deleteRule(rule) },
                                 onToggleRule = { rule -> mainViewModel.toggleRule(rule) },
                                 onMoveUp = { rule -> mainViewModel.moveRuleUp(rule, rules) },
@@ -161,13 +167,15 @@ class MainActivity : ComponentActivity() {
                     // Add rule dialog
                     if (showAddDialog) {
                         val browsers by mainViewModel.installedBrowsers.collectAsState()
+                        val apps by mainViewModel.installedApps.collectAsState()
 
                         AddEditRuleDialog(
                             editingRule = null,
                             installedBrowsers = browsers,
+                            installedApps = apps,
                             onDismiss = { showAddDialog = false },
-                            onSave = { matchType, pattern, browser ->
-                                mainViewModel.addRule(matchType, pattern, browser)
+                            onSave = { matchType, pattern, browser, sourceApp ->
+                                mainViewModel.addRule(matchType, pattern, browser, sourceApp)
                                 showAddDialog = false
                             },
                             onUpdate = { }
@@ -177,12 +185,14 @@ class MainActivity : ComponentActivity() {
                     // Edit rule dialog
                     editingRule?.let { rule ->
                         val browsers by mainViewModel.installedBrowsers.collectAsState()
+                        val apps by mainViewModel.installedApps.collectAsState()
 
                         AddEditRuleDialog(
                             editingRule = rule,
                             installedBrowsers = browsers,
+                            installedApps = apps,
                             onDismiss = { editingRule = null },
-                            onSave = { _, _, _ -> },
+                            onSave = { _, _, _, _ -> },
                             onUpdate = { updatedRule ->
                                 mainViewModel.updateRule(updatedRule)
                                 editingRule = null

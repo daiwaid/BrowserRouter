@@ -12,5 +12,9 @@ data class BrowserRule(
     val targetBrowserPackage: String,
     val targetBrowserLabel: String,
     val orderIndex: Int,
-    val isEnabled: Boolean = true
+    val isEnabled: Boolean = true,
+    /** Package of the app the link must be opened from. Null matches every app. */
+    val sourcePackage: String? = null,
+    /** Human-readable label for [sourcePackage], captured when the rule is saved. */
+    val sourceLabel: String? = null
 )
